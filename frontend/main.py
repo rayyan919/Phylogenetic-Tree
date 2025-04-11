@@ -1,10 +1,8 @@
 import sys
 import csv
 from PyQt6 import QtWidgets, QtGui, QtCore
+import pyqtgraph as pg
 
-# =======================
-# Data Manager
-# =======================
 class DataManager:
     def __init__(self, csv_file):
         self.csv_file = csv_file
@@ -16,18 +14,18 @@ class DataManager:
         with open(self.csv_file, "r", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Normalize names: title case for Name and Parent
                 row["Name"] = row["Name"].title().strip()
                 row["Parent"] = row["Parent"].title().strip() if row["Parent"] else ""
-                # Store weight as float if provided, else 0
                 row["Weight"] = float(row["Weight"]) if row["Weight"] else 0.0
                 self.records.append(row)
+        f.close()
 
     def save_in_memory_record(self, record):
         self.records.append(record)
-        # In a live system, you might write to CSV. For now, changes are ephemeral.
 
     def delete_family(self, family_name):
+        if family_name.lower() == "sentinel":
+            return False
         # Remove all records corresponding to that family (and species that belong to it)
         family_name = family_name.title()
         self.records = [r for r in self.records if not (
@@ -36,7 +34,6 @@ class DataManager:
         )]
 
     def find_by_genetic_sequence(self, sequence):
-        # Compare genetic sequences only among species records
         for record in self.records:
             if record["NodeType"] == "Species" and record["GeneticSequence"] == sequence:
                 return record
@@ -44,7 +41,6 @@ class DataManager:
 
     def name_exists_with_diff_sequence(self, node_type, name, sequence):
         # Check if any record with given name exists with a different genetic sequence.
-        # For families, sequence is not applicable.
         for record in self.records:
             if record["Name"].lower() == name.lower():
                 if node_type == "Species":
@@ -63,111 +59,192 @@ class DataManager:
         # Return species records whose parent is the given family.
         return [r for r in self.records if r["NodeType"] == "Species" and r["Parent"] == family_name.title()]
 
-# =======================
-# Graphics Items for Nodes
-# =======================
-class NodeItem(QtWidgets.QGraphicsEllipseItem):
-    """Custom graphics item representing a node in the tree."""
-    def __init__(self, x, y, diameter, label, node_data, parent=None):
-        super().__init__(0, 0, diameter, diameter, parent)
-        self.setPos(x, y)
-        self.setBrush(QtGui.QBrush(QtCore.Qt.GlobalColor.lightGray))
-        self.setPen(QtGui.QPen(QtCore.Qt.GlobalColor.black))
-        self.label = label
-        self.node_data = node_data
-        # Enable mouse events
-        self.setFlag(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+class Node:
+    def __init__(self, NodeType, Name, Parent = None, GeneticSequence = None, Weight = None):
+        self.type = NodeType
+        self.name = Name
+        self.parent = Parent
+        self.seq = GeneticSequence
+        self.weight = Weight
+        self.children = []
 
-    def paint(self, painter, option, widget=None):
-        super().paint(painter, option, widget)
-        # Draw label in the center
-        rect = self.rect()
-        painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, self.label)
+    def add_child(self, child):
+        self.children.append(child)
+        return child
+    
+    def length_tree(self):
+        return len(self.children)
 
-# =======================
-# Octree (Family Tree) Window
-# =======================
-class OctreeWindow(QtWidgets.QMainWindow):
+# Octree class (visualizes genetic families)
+class Octree(QtWidgets.QMainWindow):
+
     def __init__(self, data_manager):
         super().__init__()
-        self.setWindowTitle("Octree (Family Tree)")
+        self.setWindowTitle("Octree (Genetic Families)")
         self.data_manager = data_manager
         self.setFixedSize(800, 600)
+        self.root_node = None
+        self.tree = {}
 
-        # Graphics Scene and View
-        self.scene = QtWidgets.QGraphicsScene(self)
-        self.view = QtWidgets.QGraphicsView(self.scene, self)
-        self.setCentralWidget(self.view)
+        self.main_widget = QtWidgets.QWidget()
+        self.setCentralWidget(self.main_widget)
+        self.layout = QtWidgets.QVBoxLayout()
+        self.main_widget.setLayout(self.layout)
 
-        # Toolbar for adding species
+        # Create a pyqtgraph PlotWidget and hide its axes
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.hideAxis('bottom')
+        self.plot_widget.hideAxis('left')
+        self.layout.addWidget(self.plot_widget)
+
+        # Data for visualization
+        self.node_positions = {}
+        self.node_items = {}
+        self.edge_items = []
+        self.text_items = {}
+
+        self.root_node = self.build_tree()
+        self.layout_tree(self.root_node)
+        self.create_visualization()
+        self.center_on_screen()
+
         toolbar = QtWidgets.QToolBar("Main Toolbar")
-        self.addToolBar(toolbar)
-        add_species_act = QtGui.QAction("Add Species", self)
-        add_species_act.triggered.connect(self.add_species)
-        toolbar.addAction(add_species_act)
+        toolbar.setStyleSheet("background-color: rgb(100, 150, 255); color: black;")
 
-        self.draw_octree()
+        container = QtWidgets.QWidget()
+        h_layout = QtWidgets.QHBoxLayout()
+        container.setLayout(h_layout)
+
+        left_spacer = QtWidgets.QWidget()
+        left_spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        h_layout.addWidget(left_spacer)
+
+        add_species_act = QtGui.QAction("Add New", self)
+        add_species_act.triggered.connect(self.add_species)
+        button = QtWidgets.QPushButton("Add New")
+        button.clicked.connect(lambda: add_species_act.trigger())
+        h_layout.addWidget(button)
+
+        right_spacer = QtWidgets.QWidget()
+        right_spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        h_layout.addWidget(right_spacer)
+
+        toolbar.addWidget(container)
+        self.addToolBar(toolbar)
+
+    def build_tree(self):
+        records = self.data_manager.records
+        families = {}
+        for rec in records:
+            if rec['NodeType'] == 'Family':
+                families[rec['Name'].lower()] = Node('Family', rec['Name'], rec['Parent'])
+        if 'sentinel' not in families:
+            QtWidgets.QMessageBox.critical(self, "Error", "Sentinel not found in data!")
+            return None
+        self.root_node = families['sentinel']
+
+        # Set up parent-child relationships among family nodes.
+        for rec in records:
+            if rec['NodeType'] == 'Family':
+                name = rec['Name'].lower()
+                if name == 'sentinel':
+                    continue
+                parent_name = rec['Parent'].lower() if rec['Parent'] else "sentinel"
+                if parent_name in families:
+                    families[parent_name].add_child(families[name])
+        
+        return self.root_node
+
+    def layout_tree(self, node, x=0, y=0, level=0, horizontal_spacing=100, vertical_spacing=80):
+        self.node_positions[node] = (x, y)
+        if not node.children:
+            return x + horizontal_spacing
+        next_x = x
+        for child in node.children:
+            next_x = self.layout_tree(child, next_x, y + vertical_spacing, level + 1, 
+                                       horizontal_spacing, vertical_spacing)
+        # Center the parent over its children
+        first_child_x = self.node_positions[node.children[0]][0]
+        last_child_x = self.node_positions[node.children[-1]][0]
+        self.node_positions[node] = ((first_child_x + last_child_x) / 2, y)
+        return next_x
+
+    def create_visualization(self):
+        self.plot_widget.clear()
+        self.node_items = {}
+        self.edge_items = []
+        self.text_items = {}
+
+        edge_pen = pg.mkPen(color=(200, 200, 200), width=1.5)
+
+        for node, (x, y) in self.node_positions.items():
+            node_brush = pg.mkBrush(color=(100, 150, 255))
+            scatter = pg.ScatterPlotItem()
+            scatter.addPoints([x], [-y], size=10, brush=node_brush, pen=None)
+            self.plot_widget.addItem(scatter)
+            self.node_items[node] = scatter
+
+            # Attach left-click event; ignore right-click events
+            scatter.mousePressEvent = lambda event, n=node: self.family_node_clicked(event, n)
+
+            text = pg.TextItem(node.name, anchor=(0.5, 0))
+            text.setPos(x, -y - 5)
+            self.plot_widget.addItem(text)
+            self.text_items[node] = text
+
+            for child in node.children:
+                child_x, child_y = self.node_positions[child]
+                line = pg.PlotCurveItem([x, child_x], [-y, -child_y], pen=edge_pen)
+                self.plot_widget.addItem(line)
+                self.edge_items.append(line)
+
+        self.plot_widget.autoRange()
+
+    def center_on_screen(self):
+        screen_geometry = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        window_geometry = self.frameGeometry()
+        center_point = screen_geometry.center()
+        window_geometry.moveCenter(center_point)
+        self.move(window_geometry.topLeft())
+
+    def moveEvent(self, event):
+        self.center_on_screen()
 
     def draw_octree(self):
-        self.scene.clear()
-        families = self.data_manager.get_families()
+        self.node_positions.clear()
+        self.build_tree()
+        self.layout_tree(self.root_node)
+        self.create_visualization()
 
-        # Build a dictionary for quick lookup and for our (simple) tree structure.
-        # For this demo, assume the sentinel node is always named "Sentinel"
-        sentinel = None
-        for fam in families:
-            if fam["Name"].lower() == "sentinel":
-                sentinel = fam
-                break
+    def family_node_clicked(self, event, node):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and node.name.lower() != 'sentinel':
+            msgBox = QtWidgets.QMessageBox(self)
+            msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
+            msgBox.setWindowTitle("Family Options")
+            msgBox.setText(f"Select an action for family '{node.name}'.")
+            delete_button = msgBox.addButton("Delete Family", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+            view_button = msgBox.addButton("View BK-tree", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+            msgBox.addButton("Close", QtWidgets.QMessageBox.ButtonRole.RejectRole)
 
-        if not sentinel:
-            QtWidgets.QMessageBox.critical(self, "Error", "Sentinel node not found in data.")
-            return
+            rect = msgBox.frameGeometry()
+            rect.moveCenter(self.geometry().center())
+            msgBox.move(rect.topLeft())
+            msgBox.exec()
+            clicked = msgBox.clickedButton()
 
-        # For demonstration, we draw the sentinel in the center and arrange family nodes radially.
-        center_x, center_y = 400, 300
-        sentinel_item = NodeItem(center_x - 20, center_y - 20, 40, sentinel["Name"], sentinel)
-        self.scene.addItem(sentinel_item)
-        sentinel_item.setFlag(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-
-        # Draw the first level: families whose parent is Sentinel
-        first_level = [fam for fam in families if fam["Parent"].lower() == "sentinel"]
-        radius = 150
-        angle_step = 360 / len(first_level) if first_level else 0
-
-        for idx, fam in enumerate(first_level):
-            angle = angle_step * idx
-            rad = angle * 3.14 / 180
-            x = center_x + radius * QtCore.qCos(rad) - 20
-            y = center_y + radius * QtCore.qSin(rad) - 20
-            fam_item = NodeItem(x, y, 40, fam["Name"], fam)
-            self.scene.addItem(fam_item)
-            fam_item.setToolTip("Family: " + fam["Name"])
-            # Install event filter or override mousePressEvent:
-            fam_item.mousePressEvent = lambda event, item=fam_item: self.family_node_clicked(event, item)
-
-        # For further levels we could compute positions relative to their parent.
-        # For simplicity, here we assume no more than one level after sentinel.
-
-    def family_node_clicked(self, event, node_item):
-        if event.button() == QtCore.Qt.MouseButton.LeftButton:
-            # Create a pop-up menu with options: Delete Family, View BK-tree
-            menu = QtWidgets.QMenu()
-            delete_action = menu.addAction("Delete Family")
-            view_bk_action = menu.addAction("View BK-tree")
-            action = menu.exec(self.mapToGlobal(event.pos().toPoint()))
-            if action == delete_action:
-                reply = QtWidgets.QMessageBox.question(self, "Confirm Delete",
-                                                       f"Delete family '{node_item.label}'?",
-                                                       QtWidgets.QMessageBox.StandardButton.Yes |
-                                                       QtWidgets.QMessageBox.StandardButton.No)
+            if clicked == delete_button:
+                reply = QtWidgets.QMessageBox.question(
+                    self, "Confirm Delete",
+                    f"Delete family '{node.name}'?",
+                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                    QtWidgets.QMessageBox.StandardButton.No
+                )
                 if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                    self.data_manager.delete_family(node_item.label)
+                    self.data_manager.delete_family(node.name)
                     QtWidgets.QMessageBox.information(self, "Info", "Family deleted. Tree updated.")
                     self.draw_octree()
-            elif action == view_bk_action:
-                # Open BK-tree view for the selected family.
-                self.open_bk_tree(node_item.label)
+            elif clicked == view_button:
+                self.open_bk_tree(node.name)
 
     def open_bk_tree(self, family_name):
         self.bk_window = BKTreeWindow(self.data_manager, family_name)
@@ -175,39 +252,20 @@ class OctreeWindow(QtWidgets.QMainWindow):
         self.close()
 
     def add_species(self):
-        # Sequential input dialogs: genetic sequence -> species name -> family name.
-        # Genetic Sequence
         while True:
             seq, ok = QtWidgets.QInputDialog.getText(self, "Input Genetic Sequence",
-                                                       "Enter 128-character genetic sequence:")
+                                                    "Enter 128-character genetic sequence:")
             if not ok:
                 return  # canceled
             seq = seq.strip()
             if len(seq) != 128:
                 QtWidgets.QMessageBox.warning(self, "Error", "Genetic sequence must be exactly 128 characters.")
                 continue
-            # Check if sequence already exists
             if self.data_manager.find_by_genetic_sequence(seq):
                 QtWidgets.QMessageBox.warning(self, "Error", "Species already exists (sequence duplicate).")
                 return
             break
 
-        # Species Name
-        while True:
-            specie, ok = QtWidgets.QInputDialog.getText(self, "Input Species Name", "Enter species name:")
-            if not ok:
-                return
-            specie = specie.title().strip()
-            if not specie:
-                QtWidgets.QMessageBox.warning(self, "Error", "Species name cannot be empty.")
-                continue
-            # Check if name exists with a different sequence
-            if self.data_manager.name_exists_with_diff_sequence("Species", specie, seq):
-                QtWidgets.QMessageBox.warning(self, "Error", "Species name already exists for a different sequence.")
-                return
-            break
-
-        # Family Name
         while True:
             family, ok = QtWidgets.QInputDialog.getText(self, "Input Family Name", "Enter family name:")
             if not ok:
@@ -216,27 +274,56 @@ class OctreeWindow(QtWidgets.QMainWindow):
             if not family:
                 QtWidgets.QMessageBox.warning(self, "Error", "Family name cannot be empty.")
                 continue
-            # Check if family exists with a different record (for species, it’s an error if name exists with different sequence)
-            if self.data_manager.name_exists_with_diff_sequence("Species", family, seq):
-                QtWidgets.QMessageBox.warning(self, "Error", "Family name already exists for a different sequence.")
+            break
+
+        while True:
+            parent_family, ok = QtWidgets.QInputDialog.getText(
+                self, "Input Parent Family",
+                "Enter parent's family name for this family (leave blank for Sentinel):"
+            )
+            if not ok:
+                return
+            parent_family = parent_family.title().strip()
+            if not parent_family:
+                parent_family = "Sentinel"
+            break
+
+        families = self.data_manager.get_families()
+        if not any(rec["Name"].lower() == family.lower() for rec in families):
+            new_family_record = {
+                "NodeType": "Family",
+                "Name": family,
+                "Parent": parent_family,
+                "GeneticSequence": "",
+                "Weight": 0.0
+            }
+            self.data_manager.save_in_memory_record(new_family_record)
+
+        while True:
+            specie, ok = QtWidgets.QInputDialog.getText(self, "Input Species Name", "Enter species name:")
+            if not ok:
+                return
+            specie = specie.title().strip()
+            if not specie:
+                QtWidgets.QMessageBox.warning(self, "Error", "Species name cannot be empty.")
+                continue
+            if self.data_manager.name_exists_with_diff_sequence("Species", specie, seq):
+                QtWidgets.QMessageBox.warning(self, "Error", "Species name already exists for a different sequence.")
                 return
             break
 
-        # If checks pass, create a new species record.
         new_record = {
             "NodeType": "Species",
             "Name": specie,
             "Parent": family,
             "GeneticSequence": seq,
-            "Weight": 1.0  # for demonstration, set a default weight
+            "Weight": 1.0  # default weight for demonstration
         }
         self.data_manager.save_in_memory_record(new_record)
         QtWidgets.QMessageBox.information(self, "Info", "Species added. Tree updated.")
         self.draw_octree()
+  
 
-# =======================
-# BK-Tree (Species Tree) Window
-# =======================
 class BKTreeWindow(QtWidgets.QMainWindow):
     def __init__(self, data_manager, family_name):
         super().__init__()
@@ -299,13 +386,10 @@ class BKTreeWindow(QtWidgets.QMainWindow):
         self.octree_window.show()
         self.close()
 
-# =======================
-# Main Application Runner
-# =======================
 def main():
     app = QtWidgets.QApplication(sys.argv)
     data_manager = DataManager("data.csv")
-    window = OctreeWindow(data_manager)
+    window = Octree(data_manager)
     window.show()
     sys.exit(app.exec())
 
