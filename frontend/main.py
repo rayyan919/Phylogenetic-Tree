@@ -16,7 +16,8 @@ class DataManager:
             for row in reader:
                 row["Name"] = row["Name"].title().strip()
                 row["Parent"] = row["Parent"].title().strip() if row["Parent"] else ""
-                row["Weight"] = float(row["Weight"]) if row["Weight"] else 0.0
+                weight_str = row["Weight"].strip() if row["Weight"] else ""
+                row["Weight"] = int(weight_str) if weight_str else 0
                 self.records.append(row)
         f.close()
 
@@ -44,7 +45,6 @@ class DataManager:
         for record in self.records:
             if record["Name"].lower() == name.lower():
                 if node_type == "Species":
-                    # If the found record's sequence is different from the input sequence.
                     if record["GeneticSequence"] != sequence:
                         return True
                 else:
@@ -52,11 +52,9 @@ class DataManager:
         return False
 
     def get_families(self):
-        # Return a list of family records.
         return [r for r in self.records if r["NodeType"] == "Family"]
 
     def get_species_by_family(self, family_name):
-        # Return species records whose parent is the given family.
         return [r for r in self.records if r["NodeType"] == "Species" and r["Parent"] == family_name.title()]
 
 class Node:
@@ -97,7 +95,6 @@ class Octree(QtWidgets.QMainWindow):
         self.plot_widget.hideAxis('left')
         self.layout.addWidget(self.plot_widget)
 
-        # Data for visualization
         self.node_positions = {}
         self.node_items = {}
         self.edge_items = []
@@ -247,7 +244,7 @@ class Octree(QtWidgets.QMainWindow):
                 self.open_bk_tree(node.name)
 
     def open_bk_tree(self, family_name):
-        self.bk_window = BKTreeWindow(self.data_manager, family_name)
+        self.bk_window = BKTree(self.data_manager, family_name)
         self.bk_window.show()
         self.close()
 
@@ -317,72 +314,201 @@ class Octree(QtWidgets.QMainWindow):
             "Name": specie,
             "Parent": family,
             "GeneticSequence": seq,
-            "Weight": 1.0  # default weight for demonstration
+            "Weight": 1  # default weight for demonstration
         }
         self.data_manager.save_in_memory_record(new_record)
         QtWidgets.QMessageBox.information(self, "Info", "Species added. Tree updated.")
         self.draw_octree()
   
-
-class BKTreeWindow(QtWidgets.QMainWindow):
+# BkTree class (visualizes species similarity)
+class BKTree(QtWidgets.QMainWindow):
     def __init__(self, data_manager, family_name):
         super().__init__()
-        self.setWindowTitle(f"BK-Tree for {family_name}")
         self.data_manager = data_manager
-        self.family_name = family_name
+        self.family_name = family_name.title().strip()
+        self.setWindowTitle(f"BK-Tree for {self.family_name}")
         self.setFixedSize(800, 600)
 
-        central = QtWidgets.QWidget()
-        self.setCentralWidget(central)
-        vbox = QtWidgets.QVBoxLayout(central)
+        # Main widget and layout
+        self.main_widget = QtWidgets.QWidget()
+        self.setCentralWidget(self.main_widget)
+        self.layout = QtWidgets.QVBoxLayout()
+        self.main_widget.setLayout(self.layout)
 
-        # Back button at top.
-        back_button = QtWidgets.QPushButton("Back")
-        back_button.clicked.connect(self.return_to_octree)
-        vbox.addWidget(back_button)
+        # Back button at the top
+        toolbar = QtWidgets.QToolBar("Back")
+        toolbar.setStyleSheet("background-color: rgb(100, 150, 255); color: black;")
 
-        self.scene = QtWidgets.QGraphicsScene(self)
-        self.view = QtWidgets.QGraphicsView(self.scene, self)
-        vbox.addWidget(self.view)
+        container = QtWidgets.QWidget()
+        h_layout = QtWidgets.QHBoxLayout()
+        container.setLayout(h_layout)
 
-        self.draw_bk_tree()
+        left_spacer = QtWidgets.QWidget()
+        left_spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        h_layout.addWidget(left_spacer)
 
-    def draw_bk_tree(self):
-        self.scene.clear()
+        back_act = QtGui.QAction("Back Button", self)
+        back_act.triggered.connect(self.return_to_octree)
+        button = QtWidgets.QPushButton("Back")
+        button.clicked.connect(lambda: back_act.trigger())
+        h_layout.addWidget(button)
+
+        right_spacer = QtWidgets.QWidget()
+        right_spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        h_layout.addWidget(right_spacer)
+
+        toolbar.addWidget(container)
+        self.addToolBar(toolbar)
+
+        # Create a pyqtgraph PlotWidget and hide its axes
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.hideAxis('bottom')
+        self.plot_widget.hideAxis('left')
+        self.layout.addWidget(self.plot_widget)
+
+        # Data structures for visualization
+        self.node_positions = {}
+        self.node_items = {}
+        self.edge_items = []
+        self.text_items = {}
+
+        # Build the BK-tree from species records.
+        self.root_node = self.build_tree()
+        self.layout_tree(self.root_node)
+        self.create_visualization()
+        self.center_on_screen()
+
+    def build_tree(self):
+        root = Node("Family", self.family_name)
         species_records = self.data_manager.get_species_by_family(self.family_name)
-        if not species_records:
-            QtWidgets.QMessageBox.information(self, "Info", f"No species found for family {self.family_name}.")
-            return
+        for rec in species_records:
+            species_node = Node("Species", rec["Name"], rec["Parent"],
+                                rec["GeneticSequence"], rec["Weight"])
+            root.add_child(species_node)
+        return root
 
-        # Build a simple vertical layout: assume each species (first record is root) gets its own column.
-        y = 50
-        x = 100
-        gap_y = 100
-        gap_x = 200
+    def layout_tree(self, node, x=0, y=0, level=0, horizontal_spacing=100, vertical_spacing=80):
+        self.node_positions[node] = (x, y)
+        if not node.children:
+            return x + horizontal_spacing
+        next_x = x
+        for child in node.children:
+            next_x = self.layout_tree(child, next_x, y + vertical_spacing, level + 1,
+                                       horizontal_spacing, vertical_spacing)
+        # Center parent over its children.
+        first_child_x = self.node_positions[node.children[0]][0]
+        last_child_x = self.node_positions[node.children[-1]][0]
+        self.node_positions[node] = ((first_child_x + last_child_x) / 2, y)
+        return next_x
 
-        # For demonstration, we assume each species name appears only once.
-        for idx, record in enumerate(species_records):
-            specie_item = NodeItem(x + idx * gap_x, y, 40, record["Name"], record)
-            self.scene.addItem(specie_item)
-            specie_item.setToolTip("Species: " + record["Name"])
-            specie_item.mousePressEvent = lambda event, item=specie_item: self.specie_node_clicked(event, item)
+    def create_visualization(self):
+        self.plot_widget.clear()
+        self.node_items = {}
+        self.edge_items = []
+        self.text_items = {}
 
-    def specie_node_clicked(self, event, node_item):
+        edge_pen = pg.mkPen(color=(200, 200, 200), width=1.5)
+
+        for node, (x, y) in self.node_positions.items():
+            if node == self.root_node:
+                node_brush = pg.mkBrush(color=(255, 100, 100))  # e.g., red for the root.
+            else:
+                node_brush = pg.mkBrush(color=(100, 200, 100))  # e.g., green for species.
+            scatter = pg.ScatterPlotItem()
+            scatter.addPoints([x], [-y], size=10, brush=node_brush, pen=None)
+            self.plot_widget.addItem(scatter)
+            self.node_items[node] = scatter
+
+            # Attach left-click event; ignore right-click events.
+            scatter.mousePressEvent = lambda event, n=node: self.species_node_clicked(event, n)
+
+            # Display node text; non-root nodes include weight.
+            display_text = node.name
+            if node != self.root_node:
+                display_text += f"\n({node.weight})"
+            text_item = pg.TextItem(display_text, anchor=(0.5, 0))
+            text_item.setPos(x, -y - 5)
+            self.plot_widget.addItem(text_item)
+            self.text_items[node] = text_item
+
+            # Draw edges to children.
+            for child in node.children:
+                child_x, child_y = self.node_positions[child]
+                line = pg.PlotCurveItem([x, child_x], [-y, -child_y], pen=edge_pen)
+                self.plot_widget.addItem(line)
+                # Add the weight label on the edge midpoint.
+                mid_x = (x + child_x) / 2
+                mid_y = (y + child_y) / 2
+                weight_text = pg.TextItem(str(child.weight), anchor=(0.5, 0.5))
+                weight_text.setPos(mid_x, -mid_y)
+                self.plot_widget.addItem(weight_text)
+                self.edge_items.append(line)
+
+        self.plot_widget.autoRange()
+
+    def center_on_screen(self):
+        screen_geometry = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        window_geometry = self.frameGeometry()
+        center_point = screen_geometry.center()
+        window_geometry.moveCenter(center_point)
+        self.move(window_geometry.topLeft())
+
+    def moveEvent(self, event):
+        self.center_on_screen()
+
+    def draw_bktree(self):
+        self.node_positions.clear()
+        self.root_node = self.build_tree()
+        self.layout_tree(self.root_node)
+        self.create_visualization()
+
+    def species_node_clicked(self, event, node):
         if event.button() == QtCore.Qt.MouseButton.LeftButton:
-            reply = QtWidgets.QMessageBox.question(self, "Confirm Mutation",
-                                                   "Confirm Markov model mutation for this species?",
-                                                   QtWidgets.QMessageBox.StandardButton.Yes |
-                                                   QtWidgets.QMessageBox.StandardButton.No)
-            if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                # Here you would call your mutation algorithm.
-                # For now, we simulate by changing node color.
-                node_item.setBrush(QtGui.QBrush(QtCore.Qt.GlobalColor.green))
-                QtWidgets.QMessageBox.information(self, "Info", "Mutated successfully.")
-                # Return to octree view after mutation.
-                self.return_to_octree()
+            if node == self.root_node:
+                msgBox = QtWidgets.QMessageBox(self)
+                msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
+                msgBox.setWindowTitle("Delete Entire BK-Tree")
+                msgBox.setText(f"Delete entire family '{node.name}'?\n(This will remove all species under this family.)")
+                delete_button = msgBox.addButton("Delete Entire", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+                msgBox.addButton("Cancel", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+                rect = msgBox.frameGeometry()
+                rect.moveCenter(self.geometry().center())
+                msgBox.move(rect.topLeft())
+                msgBox.exec()
+                if msgBox.clickedButton() == delete_button:
+                    self.data_manager.records = [r for r in self.data_manager.records if not (
+                        r["NodeType"] == "Species" and r["Parent"] == self.family_name
+                    )]
+                    QtWidgets.QMessageBox.information(self, "Info", "Entire BK-tree deleted.")
+                    self.draw_bktree()
+            else:
+                msgBox = QtWidgets.QMessageBox(self)
+                msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
+                msgBox.setWindowTitle("Species Options")
+                msgBox.setText(f"Select an action for species '{node.name}':")
+                delete_button = msgBox.addButton("Delete Species", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+                mutate_button = msgBox.addButton("Mutate", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+                msgBox.addButton("Cancel", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+                rect = msgBox.frameGeometry()
+                rect.moveCenter(self.geometry().center())
+                msgBox.move(rect.topLeft())
+                msgBox.exec()
+                clicked = msgBox.clickedButton()
+                if clicked == delete_button:
+                    self.data_manager.records = [r for r in self.data_manager.records if not (
+                        r["NodeType"] == "Species" and r["Name"].lower() == node.name.lower() and r["Parent"] == node.parent
+                    )]
+                    QtWidgets.QMessageBox.information(self, "Info", f"Species '{node.name}' deleted.")
+                    self.draw_bktree()
+                elif clicked == mutate_button:
+                    import random
+                    node.weight = random.randint(1, 6)
+                    QtWidgets.QMessageBox.information(self, "Info", f"Species '{node.name}' mutated successfully.")
+                    self.draw_bktree()
 
     def return_to_octree(self):
-        self.octree_window = OctreeWindow(self.data_manager)
+        from main import Octree
+        self.octree_window = Octree(self.data_manager)
         self.octree_window.show()
         self.close()
 
