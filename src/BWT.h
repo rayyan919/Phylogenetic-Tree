@@ -17,21 +17,17 @@ public:
         rle = runLengthEncode(bwt);
     }
 
-    // Returns the run-length encoded BWT as a vector of (count, base) pairs.
     const std::vector<std::pair<int, char>> &get() const
     {
         return rle;
     }
 
-    // Updates the RLEBWT with a new run-length encoded vector.
     void set(const std::vector<std::pair<int, char>> &newRLE)
     {
         rle = newRLE;
     }
 
 private:
-    // Stores the run-length encoded BWT as a vector of pairs.
-    // Each pair is of the form {count, base}
     std::vector<std::pair<int, char>> rle;
 
     // Computes the Burrows–Wheeler Transform of the input gene sequence.
@@ -43,19 +39,15 @@ private:
         std::string s = input + "$";
         size_t n = s.size();
 
-        // Generate all rotations (cyclic shifts) of the string.
         std::vector<std::string> rotations;
         rotations.reserve(n);
         for (size_t i = 0; i < n; ++i)
         {
-            // Rotation: substring from i to end concatenated with substring from beginning to i.
             rotations.push_back(s.substr(i) + s.substr(0, i));
         }
 
-        // Sort rotations lexicographically.
         std::sort(rotations.begin(), rotations.end());
 
-        // Build the BWT result by taking the last character of each sorted rotation.
         std::string bwt;
         bwt.reserve(n);
         for (const auto &rotation : rotations)
@@ -69,8 +61,6 @@ private:
         return bwt;
     }
 
-    // Converts the given string into its run-length encoded form
-    // represented as a vector of (count, base) pairs.
     std::vector<std::pair<int, char>> runLengthEncode(const std::string &input)
     {
         std::vector<std::pair<int, char>> encoded;

@@ -110,8 +110,6 @@ namespace MarkovModel
                     mutationCount++;
                 }
 
-                // Append the mutated base to the new RLE representation.
-                // Group runs of the same consecutive letter.
                 if (!newRLE.empty() && newRLE.back().second == mutated)
                 {
                     newRLE.back().first++;
@@ -126,8 +124,6 @@ namespace MarkovModel
         // Update the original RLEBWT vector with the mutated result.
         rle.set(newRLE);
 
-        // Compute and return the mutation ratio:
-        // (number of mutated bases in the original sequence) / (total original length)
         double mutationRatio = static_cast<double>(mutationCount) / static_cast<double>(originalLen);
         return mutationRatio;
     }

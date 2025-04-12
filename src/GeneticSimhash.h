@@ -157,22 +157,6 @@
 namespace GeneticSimhash
 {
 
-    /**
-     * Revised custom nucleotide hash.
-     *
-     * This function computes a rolling hash over the input segment using a base of 131.
-     * For each nucleotide, we assign:
-     *   A → 1, T → 2, C → 3, G → 4.
-     * The hash is computed as:
-     *   hash = 0;
-     *   for each nucleotide in the segment:
-     *       hash = hash * 131 + (value of nucleotide);
-     *
-     * Then we multiply the resulting hash by a large constant (0x9e3779b97f4a7c15ULL)
-     * to “amplify” the result into a full 64-bit value. This helps ensure that even short
-     * segments yield high‐magnitude hash values so that when aggregated via Simhash::compute(),
-     * the final simhash is well distributed.
-     */
     inline uint64_t custom_nucleotide_hash(const std::string &segment)
     {
         uint64_t hash = 0;
@@ -204,24 +188,6 @@ namespace GeneticSimhash
         return hash;
     }
 
-    /**
-     * Compute the 64-bit simhash for a genetic sequence.
-     *
-     * The sequence is divided into numSegments equal parts (default is 32).
-     * Each segment is hashed using our custom_nucleotide_hash, and then the vector
-     * of these segment hashes is combined by Simhash::compute() (which essentially votes
-     * bit-by-bit based on the sign of aggregated counts) to yield a final 64-bit simhash.
-     *
-     * By using a large mixing constant, we ensure that even if segments are very short,
-     * their hash values span a much larger range. As a result, similar genetic sequences
-     * produce similar (but not tiny) simhash values.
-     *
-     * @param geneticSequence The input genetic sequence.
-     * @param numSegments     The number of segments into which the sequence is divided.
-     *                        Defaults to 32 or the sequence length if that is smaller.
-     * @return                A 64-bit simhash for the given sequence.
-     * @throws std::invalid_argument if geneticSequence is empty.
-     */
     inline Simhash::hash_t computeSimhash(const std::string &geneticSequence, size_t numSegments = 32)
     {
         if (geneticSequence.empty())
@@ -256,19 +222,6 @@ namespace GeneticSimhash
         return Simhash::compute(segmentHashes);
     }
 
-    /**
-     * Deviate (mutate) an existing simhash based on a mutation ratio.
-     *
-     * Given an original simhash and a mutation ratio (mutated_bases/total_bases),
-     * this function deterministically flips roughly round(ratio * 64) bits in the simhash.
-     *
-     * It uses a simple linear congruential generator (LCG) seeded with the original simhash
-     * to select bits to flip.
-     *
-     * @param original The original 64-bit simhash.
-     * @param ratio    The mutation ratio.
-     * @return         A new 64-bit simhash that has been deviated.
-     */
     inline Simhash::hash_t deviateSimhash(Simhash::hash_t original, double ratio)
     {
         const size_t totalBits = 64;
