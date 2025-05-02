@@ -1,266 +1,467 @@
-#include <iostream>
+// #ifndef OCTREE_H
+// #define OCTREE_H
+
+// #include <iostream>
+// #include <vector>
+// #include <memory>
+// #include <stdexcept>
+// #include <string>
+// #include <cstdint>
+// #include "Bktree.h"
+// #include "GeneticSimhash.h"
+
+// namespace Phylo
+// {
+
+//     static const uint32_t MAX_X = 4095;
+//     static const uint32_t MAX_Y = 4095;
+//     static const uint32_t MAX_Z = 4095;
+
+//     static const size_t CAPACITY = 15;
+//     static const size_t MAX_RLEBWT_DISTANCE = 6;
+
+//     struct OctreeNode
+//     {
+//         uint32_t minX, minY, minZ;
+//         uint32_t maxX, maxY, maxZ;
+
+//         std::unique_ptr<BKSpeciesTree> speciesTree;
+//         std::vector<std::unique_ptr<OctreeNode>> children;
+
+//         OctreeNode(uint32_t minX_, uint32_t minY_, uint32_t minZ_,
+//                    uint32_t maxX_, uint32_t maxY_, uint32_t maxZ_)
+//             : minX(minX_), minY(minY_), minZ(minZ_),
+//               maxX(maxX_), maxY(maxY_), maxZ(maxZ_) {}
+
+//         bool contains(uint32_t x, uint32_t y, uint32_t z) const
+//         {
+//             return (x >= minX && x <= maxX &&
+//                     y >= minY && y <= maxY &&
+//                     z >= minZ && z <= maxZ);
+//         }
+
+//         bool isLeaf() const { return children.empty(); }
+//     };
+
+//     class Octree
+//     {
+//     public:
+//         Octree()
+//         {
+//             root = std::make_unique<OctreeNode>(0, 0, 0, MAX_X, MAX_Y, MAX_Z);
+//         }
+
+//         void insertSpecies(const std::shared_ptr<SpeciesRecord> &species)
+//         {
+//             insert(root.get(), species);
+//         }
+
+//         bool removeSpecies(const std::string &speciesName)
+//         {
+//             bool removed = remove(root.get(), speciesName);
+//             if (removed)
+//                 rebalance(root.get());
+//             return removed;
+//         }
+
+//         OctreeNode *searchSpecies(const std::string &speciesName)
+//         {
+//             return search(root.get(), speciesName);
+//         }
+
+//     private:
+//         std::unique_ptr<OctreeNode> root;
+
+//         int getOctant(const OctreeNode *node, uint32_t x, uint32_t y, uint32_t z)
+//         {
+//             uint32_t midX = (node->minX + node->maxX) / 2;
+//             uint32_t midY = (node->minY + node->maxY) / 2;
+//             uint32_t midZ = (node->minZ + node->maxZ) / 2;
+
+//             int octant = 0;
+//             if (x > midX)
+//                 octant |= 1;
+//             if (y > midY)
+//                 octant |= 2;
+//             if (z > midZ)
+//                 octant |= 4;
+//             return octant;
+//         }
+
+//         void subdivide(OctreeNode *node)
+//         {
+//             uint32_t midX = (node->minX + node->maxX) / 2;
+//             uint32_t midY = (node->minY + node->maxY) / 2;
+//             uint32_t midZ = (node->minZ + node->maxZ) / 2;
+
+//             node->children.resize(8);
+//             node->children[0] = std::make_unique<OctreeNode>(node->minX, node->minY, node->minZ, midX, midY, midZ);
+//             node->children[1] = std::make_unique<OctreeNode>(midX + 1, node->minY, node->minZ, node->maxX, midY, midZ);
+//             node->children[2] = std::make_unique<OctreeNode>(node->minX, midY + 1, node->minZ, midX, node->maxY, midZ);
+//             node->children[3] = std::make_unique<OctreeNode>(midX + 1, midY + 1, node->minZ, node->maxX, node->maxY, midZ);
+//             node->children[4] = std::make_unique<OctreeNode>(node->minX, node->minY, midZ + 1, midX, midY, node->maxZ);
+//             node->children[5] = std::make_unique<OctreeNode>(midX + 1, node->minY, midZ + 1, node->maxX, midY, node->maxZ);
+//             node->children[6] = std::make_unique<OctreeNode>(node->minX, midY + 1, midZ + 1, midX, node->maxY, node->maxZ);
+//             node->children[7] = std::make_unique<OctreeNode>(midX + 1, midY + 1, midZ + 1, node->maxX, node->maxY, node->maxZ);
+//         }
+
+//         // void insert(OctreeNode *node, const std::shared_ptr<SpeciesRecord> &species)
+//         // {
+//         //     if (!node->contains(species->x, species->y, species->z))
+//         //         throw std::runtime_error("Species coordinates out of bounds.");
+
+//         //     if (node->isLeaf())
+//         //     {
+//         //         if (!node->speciesTree)
+//         //         {
+//         //             node->speciesTree = std::make_unique<BKSpeciesTree>();
+//         //             node->speciesTree->insert(species);
+//         //             return;
+//         //         }
+
+//         //         std::vector<std::shared_ptr<SpeciesRecord>> similar;
+//         //         node->speciesTree->search(species->rleBWT->get(), MAX_RLEBWT_DISTANCE, similar);
+
+//         //         if (similar.empty() || node->speciesTree->size() >= CAPACITY)
+//         //         {
+//         //             subdivide(node);
+//         //             redistribute(node);
+//         //             insert(node, species);
+//         //         }
+//         //         else
+//         //         {
+//         //             node->speciesTree->insert(species);
+//         //         }
+//         //         return;
+//         //     }
+
+//         //     int oct = getOctant(node, species->x, species->y, species->z);
+//         //     insert(node->children[oct].get(), species);
+//         // }
+
+//         void insert(OctreeNode *node,
+//                     const std::shared_ptr<SpeciesRecord> &species)
+//         {
+//             if (!node->contains(species->x, species->y, species->z))
+//                 throw std::runtime_error("Species coordinates out of bounds.");
+
+//             // --- NEW: if this leaf has never seen any species, just insert and return ---
+//             if (node->isLeaf() && !node->speciesTree)
+//             {
+//                 node->speciesTree = std::make_unique<BKSpeciesTree>();
+//                 node->speciesTree->insert(species);
+//                 return;
+//             }
+
+//             // Now either this is an internal node, or it's a leaf that already has 1+ species
+//             if (node->isLeaf())
+//             {
+//                 // Gather any “similar” neighbors (by your RLEBWT metric)
+//                 std::vector<std::shared_ptr<SpeciesRecord>> similar;
+//                 node->speciesTree->search(
+//                     species->rleBWT->get(),
+//                     MAX_RLEBWT_DISTANCE,
+//                     similar);
+
+//                 // If none are similar _or_ you've hit capacity, split this family
+//                 if (similar.empty() || node->speciesTree->size() >= CAPACITY)
+//                 {
+//                     subdivide(node);
+//                     redistribute(node);
+//                     // Now that this node has children, recurse back into it
+//                     insert(node, species);
+//                 }
+//                 else
+//                 {
+//                     // There's room, and we've found similar kin — just add it
+//                     node->speciesTree->insert(species);
+//                 }
+//                 return;
+//             }
+
+//             // If we're here, it's an internal node: pick the correct child by spatial location
+//             int oct = getOctant(node, species->x, species->y, species->z);
+//             insert(node->children[oct].get(), species);
+//         }
+
+//         void redistribute(OctreeNode *node)
+//         {
+//             auto speciesList = node->speciesTree->collectAll();
+//             node->speciesTree.reset();
+//             for (const auto &species : speciesList)
+//             {
+//                 int oct = getOctant(node, species->x, species->y, species->z);
+//                 insert(node->children[oct].get(), species);
+//             }
+//         }
+
+//         bool remove(OctreeNode *node, const std::string &speciesName)
+//         {
+//             if (node->isLeaf())
+//             {
+//                 if (node->speciesTree)
+//                     return node->speciesTree->remove_by_name(speciesName);
+//                 return false;
+//             }
+//             for (auto &child : node->children)
+//             {
+//                 if (remove(child.get(), speciesName))
+//                     return true;
+//             }
+//             return false;
+//         }
+
+//         OctreeNode *search(OctreeNode *node, const std::string &speciesName)
+//         {
+//             if (node->isLeaf())
+//             {
+//                 if (node->speciesTree && node->speciesTree->exists(speciesName))
+//                     return node;
+//                 return nullptr;
+//             }
+//             for (auto &child : node->children)
+//             {
+//                 OctreeNode *found = search(child.get(), speciesName);
+//                 if (found)
+//                     return found;
+//             }
+//             return nullptr;
+//         }
+
+//         void rebalance(OctreeNode *node)
+//         {
+//             if (!node)
+//                 return;
+
+//             for (auto it = node->children.begin(); it != node->children.end();)
+//             {
+//                 rebalance(it->get());
+//                 if ((*it)->isLeaf() && (!(*it)->speciesTree || (*it)->speciesTree->size() == 0))
+//                     it = node->children.erase(it);
+//                 else
+//                     ++it;
+//             }
+
+//             if (!node->children.empty())
+//             {
+//                 bool allLeaf = true;
+//                 size_t totalSpecies = 0;
+//                 for (const auto &child : node->children)
+//                 {
+//                     if (!child->isLeaf())
+//                     {
+//                         allLeaf = false;
+//                         break;
+//                     }
+//                     if (child->speciesTree)
+//                         totalSpecies += child->speciesTree->size();
+//                 }
+//                 if (allLeaf && totalSpecies < CAPACITY)
+//                 {
+//                     node->speciesTree = std::make_unique<BKSpeciesTree>();
+//                     for (auto &child : node->children)
+//                     {
+//                         if (child->speciesTree)
+//                         {
+//                             auto allSpecies = child->speciesTree->collectAll();
+//                             for (auto &species : allSpecies)
+//                             {
+//                                 node->speciesTree->insert(species);
+//                             }
+//                         }
+//                     }
+//                     node->children.clear();
+//                 }
+//             }
+//         }
+//     };
+
+// } // namespace Phylo
+
+// #endif // OCTREE_H
+#pragma once
 #include <vector>
 #include <memory>
-#include <stdexcept>
-#include <string>
-#include <cstdint>
+#include <iostream>
 #include <algorithm>
-#include "BKtree.h"
-#include "GeneticSimhash.h" // This header our revised simhash logic
 
-// -----------------------------------------------------------------------------
-// Global parameters for coordinate scaling & node capacity.
-// We want to scale our extracted coordinates so that the entire coordinate range
-// is small enough (here 0..4095) to force subdivisions when species differ.
-// For a full 64-bit simhash, we originally extracted 21 bits for x, 21 for y, and 22 for z,
-// which yields ranges of 0..(2^21-1)=0..2097151 for x and y, and 0..4194303 for z.
-// We now scale down:
-//   new_x = old_x / 512   (since 2097151/512 ≈ 4095)
-//   new_y = old_y / 512
-//   new_z = old_z / 1024  (since 4194303/1024 ≈ 4095)
-static const uint32_t MAX_X = 4095;
-static const uint32_t MAX_Y = 4095;
-static const uint32_t MAX_Z = 4095;
-
-// Maximum species per leaf even if similar; also if a new species is not similar
-// If Hamming difference > MAX_HAMMING_DIFF to any species in a leaf, we force subdivision.
-static const size_t CAPACITY = 15;
-static const size_t MAX_HAMMING_DIFF = 6;
-
-// OctreeNode: Each node represents a family in the octree.
-struct OctreeNode
+struct Object3D
 {
-    uint32_t minX, minY, minZ;
-    uint32_t maxX, maxY, maxZ;
-    // For leaves, store species in a BK tree.
-    std::unique_ptr<BKSpeciesTree> speciesTree;
-    // Children: if empty, this node is a leaf.
-    std::vector<std::unique_ptr<OctreeNode>> children;
-
-    OctreeNode(uint32_t minX_, uint32_t minY_, uint32_t minZ_,
-               uint32_t maxX_, uint32_t maxY_, uint32_t maxZ_)
-        : minX(minX_), minY(minY_), minZ(minZ_),
-          maxX(maxX_), maxY(maxY_), maxZ(maxZ_) {}
-
-    // Returns true if the given coordinate is within this node.
-    bool contains(uint32_t x, uint32_t y, uint32_t z) const
+    int x, y, z;
+    Object3D(int x_, int y_, int z_) : x(x_), y(y_), z(z_) {}
+    bool operator==(const Object3D &other) const
     {
-        return (x >= minX && x <= maxX &&
-                y >= minY && y <= maxY &&
-                z >= minZ && z <= maxZ);
+        return x == other.x && y == other.y && z == other.z;
     }
-
-    bool isLeaf() const { return children.empty(); }
 };
 
-// Octree: Clusters species by their 3D coordinates.
-class Octree
+class OctreeNode
 {
 public:
-    Octree()
+    static const int CAPACITY = 4;
+    static int totalSubdivides;
+
+    int minX, minY, minZ;
+    int maxX, maxY, maxZ;
+
+    bool isLeaf;
+    std::vector<std::unique_ptr<Object3D>> objects;
+    std::unique_ptr<OctreeNode> children[8];
+
+    OctreeNode(int minX_, int minY_, int minZ_, int maxX_, int maxY_, int maxZ_)
+        : minX(minX_), minY(minY_), minZ(minZ_), maxX(maxX_), maxY(maxY_), maxZ(maxZ_), isLeaf(true) {}
+
+    ~OctreeNode()
     {
-        // The root covers the full coordinate space.
-        root = std::make_unique<OctreeNode>(0, 0, 0, MAX_X, MAX_Y, MAX_Z);
+        objects.clear();
+        for (auto &child : children)
+            child.reset();
     }
 
-    // Insert a species into the octree.
-    void insertSpecies(const std::string &speciesName,
-                       const std::string &geneticSequence,
-                       std::shared_ptr<RLEBWT> rleBWT_val)
+    bool contains(const Object3D &obj) const
     {
-        SpeciesRecord newSpecies(speciesName, geneticSequence, rleBWT_val);
-        insert(root.get(), newSpecies);
+        return obj.x >= minX && obj.x <= maxX &&
+               obj.y >= minY && obj.y <= maxY &&
+               obj.z >= minZ && obj.z <= maxZ;
     }
 
-    // Remove a species by name.
-    bool removeSpecies(const std::string &speciesName)
+    int getOctantIndex(const Object3D &obj) const
     {
-        bool removed = remove(root.get(), speciesName);
-        if (removed)
-            rebalance(root.get());
-        return removed;
+        int midX = (minX + maxX) / 2;
+        int midY = (minY + maxY) / 2;
+        int midZ = (minZ + maxZ) / 2;
+        int index = 0;
+        if (obj.x > midX)
+            index |= 1;
+        if (obj.y > midY)
+            index |= 2;
+        if (obj.z > midZ)
+            index |= 4;
+        return index;
     }
 
-    // Search for a species by name. Returns the pointer to the octree node containing it (or nullptr).
-    OctreeNode *searchSpecies(const std::string &speciesName)
+    void subdivide()
     {
-        return search(root.get(), speciesName);
-    }
+        ++totalSubdivides;
+        int midX = (minX + maxX) / 2;
+        int midY = (minY + maxY) / 2;
+        int midZ = (minZ + maxZ) / 2;
 
-private:
-    std::unique_ptr<OctreeNode> root;
+        children[0] = std::make_unique<OctreeNode>(minX, minY, minZ, midX, midY, midZ);
+        children[1] = std::make_unique<OctreeNode>(midX + 1, minY, minZ, maxX, midY, midZ);
+        children[2] = std::make_unique<OctreeNode>(minX, midY + 1, minZ, midX, maxY, midZ);
+        children[3] = std::make_unique<OctreeNode>(midX + 1, midY + 1, minZ, maxX, maxY, midZ);
+        children[4] = std::make_unique<OctreeNode>(minX, minY, midZ + 1, midX, midY, maxZ);
+        children[5] = std::make_unique<OctreeNode>(midX + 1, minY, midZ + 1, maxX, midY, maxZ);
+        children[6] = std::make_unique<OctreeNode>(minX, midY + 1, midZ + 1, midX, maxY, maxZ);
+        children[7] = std::make_unique<OctreeNode>(midX + 1, midY + 1, midZ + 1, maxX, maxY, maxZ);
 
-    // Determine the octant index (0-7) for a coordinate within a node.
-    int getOctant(const OctreeNode *node, uint32_t x, uint32_t y, uint32_t z)
-    {
-        uint32_t midX = (node->minX + node->maxX) / 2;
-        uint32_t midY = (node->minY + node->maxY) / 2;
-        uint32_t midZ = (node->minZ + node->maxZ) / 2;
-        int octant = 0;
-        if (x > midX)
-            octant |= 1;
-        if (y > midY)
-            octant |= 2;
-        if (z > midZ)
-            octant |= 4;
-        return octant;
-    }
-
-    // Subdivide a leaf node into 8 children.
-    void subdivideNode(OctreeNode *node)
-    {
-        uint32_t midX = (node->minX + node->maxX) / 2;
-        uint32_t midY = (node->minY + node->maxY) / 2;
-        uint32_t midZ = (node->minZ + node->maxZ) / 2;
-        node->children.resize(8);
-        node->children[0] = std::make_unique<OctreeNode>(node->minX, node->minY, node->minZ, midX, midY, midZ);
-        node->children[1] = std::make_unique<OctreeNode>(midX + 1, node->minY, node->minZ, node->maxX, midY, midZ);
-        node->children[2] = std::make_unique<OctreeNode>(node->minX, midY + 1, node->minZ, midX, node->maxY, midZ);
-        node->children[3] = std::make_unique<OctreeNode>(midX + 1, midY + 1, node->minZ, node->maxX, node->maxY, midZ);
-        node->children[4] = std::make_unique<OctreeNode>(node->minX, node->minY, midZ + 1, midX, midY, node->maxZ);
-        node->children[5] = std::make_unique<OctreeNode>(midX + 1, node->minY, midZ + 1, node->maxX, midY, node->maxZ);
-        node->children[6] = std::make_unique<OctreeNode>(node->minX, midY + 1, midZ + 1, midX, node->maxY, node->maxZ);
-        node->children[7] = std::make_unique<OctreeNode>(midX + 1, midY + 1, midZ + 1, node->maxX, node->maxY, node->maxZ);
-    }
-
-    // Recursive insertion into the octree.
-    void insert(OctreeNode *node, const SpeciesRecord &sp)
-    {
-        if (!node->contains(sp.x, sp.y, sp.z))
-            throw std::runtime_error("Species coordinate is out of node bounds.");
-
-        if (node->isLeaf())
+        std::vector<std::unique_ptr<Object3D>> temp;
+        temp.swap(objects);
+        for (auto &obj : temp)
         {
-            // If no BK tree exists yet for this leaf, create one.
-            if (!node->speciesTree)
-                node->speciesTree = std::make_unique<BKSpeciesTree>();
-
-            // Check for similarity within the existing family (using RLEBWT metric).
-            std::vector<std::shared_ptr<SpeciesRecord>> similar;
-            node->speciesTree->search(sp.rleBWT->get(), MAX_HAMMING_DIFF, similar);
-
-            // If no similar species found, force subdivision to create a new family.
-            if (similar.empty())
-            {
-                subdivideNode(node);
-                // Reinsert species from the BK tree into children.
-                auto allSpecies = node->speciesTree->collectAll();
-                for (const auto &existing : allSpecies)
-                {
-                    int oct = getOctant(node, existing->x, existing->y, existing->z);
-                    insert(node->children[oct].get(), *existing);
-                }
-                node->speciesTree.reset();
-                int oct = getOctant(node, sp.x, sp.y, sp.z);
-                insert(node->children[oct].get(), sp);
-                return;
-            }
-
-            // If similar species exist and capacity is not exceeded insert.
-            if (node->speciesTree->size() < CAPACITY)
-            {
-                node->speciesTree->insert(std::make_shared<SpeciesRecord>(sp));
-                return;
-            }
-
-            // Otherwise, if similar exists but capacity is reached, subdivide.
-            subdivideNode(node);
-            auto allSpecies = node->speciesTree->collectAll();
-            for (const auto &existing : allSpecies)
-            {
-                int oct = getOctant(node, existing->x, existing->y, existing->z);
-                insert(node->children[oct].get(), *existing);
-            }
-            node->speciesTree.reset();
-            int oct = getOctant(node, sp.x, sp.y, sp.z);
-            insert(node->children[oct].get(), sp);
-            return;
+            int idx = getOctantIndex(*obj);
+            children[idx]->insert(std::move(obj));
         }
-        // If node is internal, determine the correct child.
-        int oct = getOctant(node, sp.x, sp.y, sp.z);
-        insert(node->children[oct].get(), sp);
+
+        isLeaf = false;
     }
 
-    // Try to remove from the BK tree if leaf, or from children otherwise.
-    bool remove(OctreeNode *node, const std::string &speciesName)
+    void insert(std::unique_ptr<Object3D> obj)
     {
-        if (node->isLeaf())
+        if (!contains(*obj))
+            return;
+
+        if (isLeaf)
         {
-            if (node->speciesTree && node->speciesTree->remove_by_name(speciesName))
-                return true;
+            objects.push_back(std::move(obj));
+            if (objects.size() > CAPACITY)
+            {
+                subdivide();
+            }
+        }
+        else
+        {
+            int idx = getOctantIndex(*obj);
+            children[idx]->insert(std::move(obj));
+        }
+    }
+
+    bool searchAndPrintNode(const Object3D *obj) const
+    {
+        if (!contains(*obj))
+            return false;
+
+        if (isLeaf)
+        {
+            for (const auto &o : objects)
+            {
+                if (o.get() == obj)
+                {
+                    std::cout << "Found (" << obj->x << ", " << obj->y << ", " << obj->z
+                              << ") in node with bounds: ["
+                              << minX << "," << maxX << "] x ["
+                              << minY << "," << maxY << "] x ["
+                              << minZ << "," << maxZ << "]\n";
+                    return true;
+                }
+            }
             return false;
         }
-        for (auto &child : node->children)
+        else
         {
-            if (remove(child.get(), speciesName))
-                return true;
+            int idx = getOctantIndex(*obj);
+            return children[idx]->searchAndPrintNode(obj);
         }
-        return false;
     }
 
-    // Return pointer to the node that contains the species.
-    OctreeNode *search(OctreeNode *node, const std::string &speciesName)
+    bool remove(const Object3D *target)
     {
-        if (node->isLeaf())
+        if (!contains(*target))
+            return false;
+
+        if (isLeaf)
         {
-            if (node->speciesTree && node->speciesTree->exists(speciesName))
-                return node;
-            return nullptr;
+            auto it = std::remove_if(objects.begin(), objects.end(),
+                                     [&](const std::unique_ptr<Object3D> &o)
+                                     {
+                                         return o.get() == target;
+                                     });
+            bool found = it != objects.end();
+            objects.erase(it, objects.end());
+            return found;
         }
-        for (auto &child : node->children)
+        else
         {
-            OctreeNode *res = search(child.get(), speciesName);
-            if (res)
-                return res;
+            int idx = getOctantIndex(*target);
+            return children[idx]->remove(target);
         }
-        return nullptr;
     }
 
-    // Rebalance the tree after deletion: merge underpopulated sibling families.
-    void rebalance(OctreeNode *node)
+    void print(int depth = 0) const
     {
-        if (!node)
-            return;
-        // Recurse into children.
-        for (auto it = node->children.begin(); it != node->children.end();)
+        std::string indent(depth * 2, ' ');
+        if (isLeaf)
         {
-            rebalance(it->get());
-            if ((*it)->isLeaf() && (!(*it)->speciesTree || (*it)->speciesTree->size() == 0))
-                it = node->children.erase(it);
-            else
-                ++it;
-        }
-        // Merge children if all are leaves and total species count is below CAPACITY.
-        if (!node->children.empty())
-        {
-            bool allLeaf = true;
-            size_t totalSpecies = 0;
-            for (auto &child : node->children)
+            std::cout << indent << "Leaf [" << minX << "," << maxX << "] x ["
+                      << minY << "," << maxY << "] x [" << minZ << "," << maxZ
+                      << "] : " << objects.size() << " object(s)\n";
+            for (const auto &obj : objects)
             {
-                if (!child->isLeaf())
-                {
-                    allLeaf = false;
-                    break;
-                }
-                if (child->speciesTree)
-                    totalSpecies += child->speciesTree->size();
+                std::cout << indent << "  (" << obj->x << ", " << obj->y << ", " << obj->z << ")\n";
             }
-            if (allLeaf && totalSpecies < CAPACITY)
+        }
+        else
+        {
+            std::cout << indent << "Branch Node [" << minX << "," << maxX << "] x ["
+                      << minY << "," << maxY << "] x [" << minZ << "," << maxZ << "]\n";
+            for (const auto &child : children)
             {
-                node->speciesTree = std::make_unique<BKSpeciesTree>();
-                for (auto &child : node->children)
-                {
-                    if (child->speciesTree)
-                    {
-                        auto allSp = child->speciesTree->collectAll();
-                        for (auto &sp : allSp)
-                        {
-                            node->speciesTree->insert(sp);
-                        }
-                    }
-                }
-                node->children.clear();
+                if (child)
+                    child->print(depth + 1);
             }
         }
     }
 };
+
+int OctreeNode::totalSubdivides = 0;
