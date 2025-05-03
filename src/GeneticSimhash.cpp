@@ -1,5 +1,8 @@
 #include "GeneticSimhash.h"
-
+#include <array>
+#include <cmath>
+#include <vector>
+#include <tuple>
 namespace GeneticSimhash
 {
     // --------------------------------------------------------------------
@@ -44,7 +47,7 @@ namespace GeneticSimhash
     // hashes each chunk with the function above, then feeds the
     // list of 64-bit hashes to Simhash::compute().
     // --------------------------------------------------------------------
-    Simhash::hash_t computeSimhash(BitEncodedSeq &seq, std::size_t numSegments = 32)
+    Simhash::hash_t computeSimhash(const BitEncodedSeq &seq, std::size_t numSegments)
     {
         if (seq.empty())
             throw std::invalid_argument("Genetic sequence is empty.");

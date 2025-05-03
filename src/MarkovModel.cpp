@@ -23,6 +23,12 @@ namespace MarkovModel
     //   G -> A = 0.01;
     //   G -> T = 0.01;
 
+    // The probabilities are based on the following limitations:
+    // - The model is based on the assumption that the sequence is a DNA sequence.
+    // - The model is based on the assumption that the sequence is a single strand of DNA.
+    // - It also assumes only substitution type mutations are allowed. Insertion and deletion mutations are not allowed.
+    //   This is to ensure the fixed length of the sequence is maintained.
+    // - The model is based on the assumption that the sequence is a single strand of DNA.
     // To leverage O(1) per base mutation this function avoids using complex statistical models.
     char mutateBase(char base)
     {
