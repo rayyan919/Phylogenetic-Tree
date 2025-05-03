@@ -284,6 +284,8 @@
 #include <memory>
 #include <iostream>
 #include <algorithm>
+#include <stdexcept>
+#include "Bktree.h"
 
 struct Object3D
 {
@@ -295,19 +297,27 @@ struct Object3D
     }
 };
 
+class PhylogeneticTree
+{
+};
+
 class OctreeNode
 {
-public:
+private:
     static const int CAPACITY = 4;
     static int totalSubdivides;
 
     int minX, minY, minZ;
     int maxX, maxY, maxZ;
 
-    bool isLeaf;
+    int depth;
+    std::unique_ptr<BKSpeciesTree> family;
     std::vector<std::unique_ptr<Object3D>> objects;
     std::unique_ptr<OctreeNode> children[8];
 
+    bool isLeaf;
+
+public:
     OctreeNode(int minX_, int minY_, int minZ_, int maxX_, int maxY_, int maxZ_)
         : minX(minX_), minY(minY_), minZ(minZ_), maxX(maxX_), maxY(maxY_), maxZ(maxZ_), isLeaf(true) {}
 

@@ -40,6 +40,14 @@ public:
             (data_[wordShift(idx).first] & ~mask) | value;
     }
 
+    // Comparator
+    bool operator==(const BitEncodedSeq &other) const noexcept
+    {
+        if (length_ != other.length_)
+            return false;
+        return std::equal(data_.begin(), data_.end(), other.data_.begin());
+    }
+
     // expose raw blocks if an algorithm wants bit-parallel tricks
     const std::vector<word_t> &blocks() const noexcept { return data_; }
 

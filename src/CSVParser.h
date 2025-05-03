@@ -7,7 +7,7 @@
 class CSVParser
 {
 public:
-    CSVParser(const std::string &filename) : filename(filename) {}
+    CSVParser(const std::string &filename_) : filename(filename_) {}
 
     OctreeNode &createPhyloTree()
     {

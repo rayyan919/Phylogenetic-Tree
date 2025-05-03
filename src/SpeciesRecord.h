@@ -26,6 +26,13 @@ struct SpeciesRecord
         swap(*this, other);
         return *this;
     }
+
+    // ---------- comparator ----------------------------------------------------
+    bool operator==(const SpeciesRecord &other) const
+    {
+        return speciesName == other.speciesName && *seq == *other.seq;
+    }
+
     // ---------- copy ctor ----------------------------------------------------
     SpeciesRecord(const SpeciesRecord &other)
         : speciesName{other.speciesName},
