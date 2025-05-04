@@ -98,6 +98,8 @@ namespace MarkovModel
                 ++mutatedBases;
             }
         }
-        return static_cast<double>(mutatedBases) / seq.size();
+        double raw = static_cast<double>(mutatedBases) / seq.size();
+        double truncated = std::floor(raw * 10.0) / 10.0;
+        return truncated;
     }
 }

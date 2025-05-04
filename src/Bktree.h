@@ -9,6 +9,7 @@
 #include <memory>
 #include <functional>
 #include <stdexcept>
+#include <cmath>
 #include <unordered_map>
 #include "GeneticSimhash.h"
 #include "SpeciesRecord.h"
@@ -67,10 +68,12 @@ private:
         for (uint32_t i = 0; i < n; ++i)
             if (a.at(i) != b.at(i))
                 ++mismatches;
-        return (static_cast<double>(mismatches) / n) * 100.0;
+        double raw = (static_cast<double>(mismatches) / n) * 100.0;
+        double truncated = std::floor(raw * 10.0) / 10.0;
+        return truncated; // truncate to 1 decimal place
     }
 
-    // Recursive search helper
+        // Recursive search helper
     void search_helper(const std::shared_ptr<BKSpeciesNode> &node,
                        const BitEncodedSeq &target,
                        double threshold,
@@ -113,6 +116,23 @@ public:
         return (within.size() == count);
     }
 
+    /// Find a single species by exact sequence+name (returns nullptr if not found)
+    std::shared_ptr<SpeciesRecord> findExact(
+        const BitEncodedSeq &targetSeq,
+        const std::string &targetName) const
+    {
+        // 1) Query the BK-tree for zero‐distance hits
+        auto candidates = search(targetSeq, 0.0);
+
+        // 2) Among those, pick the one with the matching name
+        for (auto &recPtr : candidates)
+        {
+            if (recPtr->speciesName == targetName)
+                return recPtr;
+        }
+        return nullptr;
+    }
+
     // Standard BK-tree insertion (no distance threshold here)
     void insert(const SpeciesRecord &sp)
     {
@@ -148,8 +168,7 @@ public:
     }
 
     // Search by Hamming threshold
-    std::vector<std::shared_ptr<SpeciesRecord>>
-    search(const BitEncodedSeq &target, double threshold) const
+    std::vector<std::shared_ptr<SpeciesRecord>> search(const BitEncodedSeq &target, double threshold) const
     {
         std::vector<std::shared_ptr<SpeciesRecord>> results;
         if (root)

@@ -9,14 +9,14 @@ class CSVParser
 public:
     CSVParser(const std::string &filename_) : filename(filename_) {}
 
-    OctreeNode &createPhyloTree()
+    PhylogeneticTree &createPhyloTree()
     {
         parse();
-        auto root = std::make_unique<OctreeNode>(0, 0, 0, 4095, 4095, 4095);
+        auto root = std::make_unique<PhylogeneticTree>(0, 0, 0, 4095, 4095, 4095);
         for (const auto &record : records)
         {
             auto species = std::make_shared<SpeciesRecord>(record.speciesName, record.seq->blocks());
-            // root->insertSpecies(species);
+            root->insert(*species);
         }
         return *root;
     }
