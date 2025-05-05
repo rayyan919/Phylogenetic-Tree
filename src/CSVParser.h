@@ -12,7 +12,7 @@ public:
     PhylogeneticTree &createPhyloTree()
     {
         parse();
-        auto root = std::make_unique<PhylogeneticTree>(0, 0, 0, 4095, 4095, 4095);
+        auto root = std::make_unique<PhylogeneticTree>(0, 0, 0, 4095, 4095, 4095, records[0].seq->size());
         for (const auto &record : records)
         {
             auto species = std::make_shared<SpeciesRecord>(record.speciesName, record.seq->blocks());
@@ -33,13 +33,28 @@ private:
             throw std::runtime_error("Could not open file: " + filename);
         }
         std::string line;
+        long long int size = -1; // initialized once
+
         while (std::getline(file, line))
         {
             std::stringstream ss(line);
             std::string speciesName, seq;
             if (std::getline(ss, speciesName, ',') && std::getline(ss, seq, ','))
             {
-                records.emplace_back(speciesName, seq);
+                if (size == -1 && seq.size() > 63) // first record
+                {
+                    size = seq.size();
+                    records.emplace_back(speciesName, seq);
+                }
+                else if (seq.size() == size)
+                {
+                    records.emplace_back(speciesName, seq);
+                }
+                else if (seq.size() > size)
+                {
+                    records.emplace_back(speciesName, seq.substr(0, size)); // snip longer
+                }
+                // sequences shorter than expected are ignored
             }
         }
     }

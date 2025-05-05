@@ -308,9 +308,10 @@ class PhylogeneticTree
 public:
     // Constructs the tree covering a 3D space from (minX,minY,minZ) to (maxX,maxY,maxZ)
     PhylogeneticTree(int minX, int minY, int minZ,
-                     int maxX, int maxY, int maxZ)
+                     int maxX, int maxY, int maxZ, long long int length_)
         : bounds_{minX, minY, minZ, maxX, maxY, maxZ},
-          root_(std::make_unique<Node>(bounds_)) {}
+          root_(std::make_unique<Node>(bounds_)),
+          length(length_) {}
 
     // Insert a species record into the tree
     void insert(const SpeciesRecord &rec)
@@ -404,6 +405,7 @@ private:
     Bounds bounds_;
     std::unique_ptr<Node> root_;
     std::unordered_map<std::string, std::tuple<int, int, int>> nameToCoords_;
+    long long int length;
 
     // Recursive insert
     void insertRec(Node *node, const SpeciesRecord &rec)
