@@ -33,13 +33,7 @@ public:
         auto it = nameToCoords_.find(name);
         if (it == nameToCoords_.end())
             return false;
-        int x, y, z;
-        std::tie(x, y, z) = it->second;
-        SpeciesRecord probe(name, "");
-        probe.x = x;
-        probe.y = y;
-        probe.z = z;
-        bool removed = removeRec(root_.get(), name, probe);
+        bool removed = removeRec(root_.get(), name);
         if (removed)
             nameToCoords_.erase(it);
         return removed;
