@@ -117,18 +117,15 @@ public:
     }
 
     /// Find a single species by exact sequence+name (returns nullptr if not found)
-    std::shared_ptr<SpeciesRecord> findExact(
-        const BitEncodedSeq &targetSeq,
-        const std::string &targetName) const
+    std::shared_ptr<SpeciesRecord> findExact(const std::string &name) const
     {
-        // 1) Query the BK-tree for zero‐distance hits
-        auto candidates = search(targetSeq, 0.0);
-
-        // 2) Among those, pick the one with the matching name
-        for (auto &recPtr : candidates)
+        if (!root)
+            return nullptr;
+        std::vector<std::shared_ptr<BKSpeciesNode>> all = collectAll();
+        for (auto &node : all)
         {
-            if (recPtr->speciesName == targetName)
-                return recPtr;
+            if (node->species->speciesName == name)
+                return node->species;
         }
         return nullptr;
     }
