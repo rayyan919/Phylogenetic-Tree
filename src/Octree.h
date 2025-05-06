@@ -151,6 +151,32 @@ private:
         return findLeaf(node, x, y, z)->family->findExact(name);
     }
 
+    // Print all species in the tree with parent-child relationships
+    void printSpeciesRec(Node *node, int depth) const
+    {
+        if (!node)
+            return;
+        std::string indent(depth * 2, ' ');
+        if (node->isLeaf)
+        {
+            std::cout << indent << "Leaf ["
+                      << node->b.minX << "," << node->b.maxX << "] x ["
+                      << node->b.minY << "," << node->b.maxY << "] x ["
+                      << node->b.minZ << "," << node->b.maxZ
+                      << "] : " << node->family->size() << " members\n";
+        }
+        else
+        {
+            std::cout << indent << "Branch ["
+                      << node->b.minX << "," << node->b.maxX << "]\n";
+            for (const auto &c : node->children)
+            {
+                if (c)
+                    printSpeciesRec(c.get(), depth + 1);
+            }
+        }
+    }
+
     // Recursive search
     bool searchRec(const Node *node, const SpeciesRecord &probe) const
     {
@@ -199,6 +225,9 @@ private:
                       << node->b.minY << "," << node->b.maxY << "] x ["
                       << node->b.minZ << "," << node->b.maxZ
                       << "] : " << node->family->size() << " members\n";
+            std::cout << indent << "Species records:";
+            node->family->print();
+            std::cout << "\n";
         }
         else
         {

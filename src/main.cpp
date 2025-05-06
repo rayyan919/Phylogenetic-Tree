@@ -54,7 +54,7 @@ int main()
 {
     try
     {
-        CSVParser parser("../input/SmallData.csv");
+        CSVParser parser("../input/MediumData.csv");
         auto phyloTree = parser.createPhyloTree();
         std::cout << "Phylogenetic tree created successfully." << std::endl;
         phyloTree->print();

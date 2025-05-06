@@ -116,6 +116,61 @@ public:
         return (within.size() == count);
     }
 
+    // Print the tree with connections and hamming weights
+    // Print the tree with connections and hamming weights
+    void print() const
+    {
+        if (!root)
+        {
+            std::cout << "Tree is empty" << std::endl;
+            return;
+        }
+
+        // Helper function to print a node and its children
+        std::function<void(const std::shared_ptr<BKSpeciesNode> &, const std::string &)> printNode =
+            [&printNode](const std::shared_ptr<BKSpeciesNode> &node, const std::string &prefix)
+        {
+            // Print current node's information
+            std::cout << prefix << node->species->speciesName;
+
+            // Print coordinates
+            std::cout << " (" << node->species->x << ", " << node->species->y;
+            if (node->species->z > 0)
+            {
+                std::cout << ", " << node->species->z;
+            }
+            std::cout << ")";
+
+            std::cout << std::endl;
+
+            // Print connections to children
+            for (const auto &[hammingWeight, child] : node->children)
+            {
+                std::cout << prefix << "[___ (" << hammingWeight << "%) --> ";
+                std::cout << child->species->speciesName;
+
+                // Print coordinates
+                std::cout << " (" << child->species->x << ", " << child->species->y;
+                if (child->species->z > 0)
+                {
+                    std::cout << ", " << child->species->z;
+                }
+                std::cout << ")";
+
+                std::cout << std::endl;
+
+                // Recursively print children with increased indentation
+                printNode(child, prefix + "    ");
+            }
+        };
+
+        // Start printing from root
+        printNode(root, "");
+
+        // Print total count of species
+        std::cout << "\nTotal species count: " << count << std::endl;
+    }
+
     /// Find a single species by exact sequence+name (returns nullptr if not found)
     std::shared_ptr<SpeciesRecord> findExact(const std::string &name) const
     {
