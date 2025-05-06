@@ -15,7 +15,7 @@ class PhylogeneticTree
 public:
     // Constructs the tree covering a 3D space from (minX,minY,minZ) to (maxX,maxY,maxZ)
     PhylogeneticTree(int minX, int minY, int minZ,
-                     int maxX, int maxY, int maxZ, long long int length_)
+                     int maxX, int maxY, int maxZ, uint32_t length_)
         : bounds_{minX, minY, minZ, maxX, maxY, maxZ},
           root_(std::make_unique<Node>(bounds_)),
           length(length_) {}
