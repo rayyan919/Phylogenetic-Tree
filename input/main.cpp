@@ -77,9 +77,10 @@ void doubleSequencesInCSV(const string &inputFile, const string &outputFile)
 
 int main()
 {
+    doubleSequencesInCSV("LargeData1.csv", "LargeData.csv"); // Call the function to double sequences
 
-    std::string inputFilename = "MediumData.csv";             // Updated to match your CSV filename
-    std::string outputFilename = "MediumDataDifferences.txt"; // Output file name
+    std::string inputFilename = "LargeData.csv";             // Updated to match your CSV filename
+    std::string outputFilename = "LargeDataDifferences.txt"; // Output file name
 
     std::ifstream file(inputFilename);
     if (!file.is_open())
