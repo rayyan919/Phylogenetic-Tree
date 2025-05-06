@@ -2,12 +2,17 @@
 #define SIMHASH_PERMUTATION_H
 
 #include "simhash.h"
+// ==============================
+// CODE TAKEN FROM https://github.com/seomoz/simhash-cpp
+// ==============================
 
 #include <vector>
 
-namespace Simhash {
-    
-    class Permutation {
+namespace Simhash
+{
+
+    class Permutation
+    {
     public:
         /**
          * Create a vector of permutations necessary to do all simhash near-dup
@@ -19,14 +24,14 @@ namespace Simhash {
         /**
          * Generate combinations of length r from population.
          */
-        static std::vector<std::vector<hash_t> > choose(
-            const std::vector<hash_t>& population, size_t r);
+        static std::vector<std::vector<hash_t>> choose(
+            const std::vector<hash_t> &population, size_t r);
 
         /**
          * Construct a permutation from its permutation masks and the maximum
          * number of bits that may differ.
          */
-        Permutation(size_t different_bits, std::vector<hash_t>& masks);
+        Permutation(size_t different_bits, std::vector<hash_t> &masks);
 
         /**
          * Apply this permutation.
@@ -49,6 +54,7 @@ namespace Simhash {
          * searched is the query with all the bits in the last
          * _differing_bits_ blocks set to 1. */
         hash_t search_mask() const;
+
     private:
         std::vector<hash_t> forward_masks;
         std::vector<hash_t> reverse_masks;

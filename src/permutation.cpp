@@ -1,14 +1,19 @@
-#include "permutation.h"
+#include "../include/permutation.h"
+
+// ==============================
+// CODE TAKEN FROM https://github.com/seomoz/simhash-cpp
+// ==============================
 
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
 
-namespace Simhash {
+namespace Simhash
+{
 
-    std::vector<std::vector<hash_t> > Permutation::choose(
-            const std::vector<hash_t>& population, size_t r)
+    std::vector<std::vector<hash_t>> Permutation::choose(
+        const std::vector<hash_t> &population, size_t r)
     {
         // This algorithm is cribbed from python's itertools page.
         size_t n = population.size();
@@ -23,7 +28,7 @@ namespace Simhash {
             indices[i] = i;
         }
 
-        std::vector<std::vector<hash_t> > results;
+        std::vector<std::vector<hash_t>> results;
         std::vector<hash_t> result(r);
 
         for (size_t i = 0; i < r; ++i)
@@ -50,7 +55,7 @@ namespace Simhash {
             indices[i] += 1;
             for (size_t j = i + 1; j < r; ++j)
             {
-                indices[j] = indices[j-1] + 1;
+                indices[j] = indices[j - 1] + 1;
             }
             for (size_t j = 0; j < r; ++j)
             {
@@ -84,8 +89,8 @@ namespace Simhash {
         for (size_t i = 0; i < number_of_blocks; ++i)
         {
             hash_t mask(0);
-            size_t start = (   i    * Simhash::BITS) / number_of_blocks;
-            size_t end   = ((i + 1) * Simhash::BITS) / number_of_blocks;
+            size_t start = (i * Simhash::BITS) / number_of_blocks;
+            size_t end = ((i + 1) * Simhash::BITS) / number_of_blocks;
             for (size_t j = start; j < end; ++j)
             {
                 mask |= (static_cast<hash_t>(1) << j);
@@ -98,7 +103,7 @@ namespace Simhash {
 
         /* All the mask choices. */
         std::vector<Permutation> results;
-        for (std::vector<hash_t>& choice : choose(blocks, count))
+        for (std::vector<hash_t> &choice : choose(blocks, count))
         {
             // Add the remaining masks -- those that were not part of choice
             for (hash_t block : blocks)
@@ -111,15 +116,12 @@ namespace Simhash {
 
             results.push_back(Permutation(different_bits, choice));
         }
-        
+
         return results;
     }
-    
-    Permutation::Permutation(size_t different_bits, std::vector<hash_t>& masks)
-        : forward_masks(masks)
-        , reverse_masks()
-        , offsets()
-        , search_mask_(0)
+
+    Permutation::Permutation(size_t different_bits, std::vector<hash_t> &masks)
+        : forward_masks(masks), reverse_masks(), offsets(), search_mask_(0)
     {
         int j(0), i(0), width(0); // counters
 
@@ -137,15 +139,19 @@ namespace Simhash {
          * blocks, and the offset of their rightmost bit. With this, we'll
          * generate net offsets between their positions in the unpermuted and
          * permuted forms, and simultaneously generate reverse masks */
-        for(; mask_it != forward_masks.end(); ++mask_it)
+        for (; mask_it != forward_masks.end(); ++mask_it)
         {
             hash_t mask = *mask_it;
             /* Find where the 1's start, and where they end. After this, `i` is
              * the position to the right of the rightmost set bit. `j` is the
              * position of the leftmost set bit. In `width`, we keep a running
              * tab of the widths of the bitmasks so far. */
-            for (i = 0;          !((1UL << i) & mask); ++i) {}
-            for (j = i; j < 64 && ((1UL << j) & mask); ++j) {}
+            for (i = 0; !((1UL << i) & mask); ++i)
+            {
+            }
+            for (j = i; j < 64 && ((1UL << j) & mask); ++j)
+            {
+            }
 
             /* Just to prove that I'm sane, and in case that I'm ever running
              * circles around this logic in the future, consider:
@@ -184,7 +190,7 @@ namespace Simhash {
              * we unpermute a number */
             if (offset > 0)
             {
-                reverse_masks.push_back(mask <<  offset);
+                reverse_masks.push_back(mask << offset);
             }
             else
             {
@@ -206,21 +212,27 @@ namespace Simhash {
 
         /* Set the first /width/ bits in the low mask to 1, and then shift it up
          * until it's a full 64-bit number. */
-        for(i = 0    ; i < width; ++i) { search_mask_ = (search_mask_ << 1) | 1; }
-        for(i = width; i < 64   ; ++i) { search_mask_ =  search_mask_ << 1;      }
+        for (i = 0; i < width; ++i)
+        {
+            search_mask_ = (search_mask_ << 1) | 1;
+        }
+        for (i = width; i < 64; ++i)
+        {
+            search_mask_ = search_mask_ << 1;
+        }
     }
 
     hash_t Permutation::apply(hash_t hash) const
     {
         std::vector<hash_t>::const_iterator masks_it(forward_masks.begin());
-        std::vector<int   >::const_iterator offset_it(     offsets.begin());
+        std::vector<int>::const_iterator offset_it(offsets.begin());
 
         hash_t result(0);
         for (; masks_it != forward_masks.end(); ++masks_it, ++offset_it)
         {
             if (*offset_it > 0)
             {
-                result = result | ((hash & *masks_it) <<   *offset_it );
+                result = result | ((hash & *masks_it) << *offset_it);
             }
             else
             {
@@ -233,14 +245,14 @@ namespace Simhash {
     hash_t Permutation::reverse(hash_t hash) const
     {
         std::vector<hash_t>::const_iterator masks_it(reverse_masks.begin());
-        std::vector<int   >::const_iterator offset_it(     offsets.begin());
+        std::vector<int>::const_iterator offset_it(offsets.begin());
 
         hash_t result(0);
         for (; masks_it != reverse_masks.end(); ++masks_it, ++offset_it)
         {
             if (*offset_it > 0)
             {
-                result = result | ((hash & *masks_it) >>   *offset_it );
+                result = result | ((hash & *masks_it) >> *offset_it);
             }
             else
             {

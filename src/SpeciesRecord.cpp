@@ -1,4 +1,4 @@
-#include "SpeciesRecord.h"
+#include "../include/SpeciesRecord.h"
 
 std::size_t SpeciesRecord::seqLength = 0;
 SpeciesRecord::SpeciesRecord(const std::string &name,
