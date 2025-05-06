@@ -7,6 +7,7 @@
 
 struct SpeciesRecord
 {
+    static std::size_t seqLength;
     std::string speciesName;
     std::unique_ptr<BitEncodedSeq> seq; // 2-bit DNA (non-null)
     Simhash::hash_t simhash{};          // current SimHash
@@ -17,8 +18,27 @@ struct SpeciesRecord
                   const std::string &newSeq, std::size_t simhashSegments = 32)
         : speciesName{name}
     {
-        this->seq = std::make_unique<BitEncodedSeq>(newSeq); // 2-bit DNA
-        recomputeSimhash(simhashSegments);
+        if (seqLength == 0)
+        {
+            seqLength = newSeq.size();
+            this->seq = std::make_unique<BitEncodedSeq>(newSeq); // 2-bit DNA
+            recomputeSimhash(simhashSegments);
+        }
+        else if (newSeq.size() == seqLength)
+        {
+            this->seq = std::make_unique<BitEncodedSeq>(newSeq); // 2-bit DNA
+            recomputeSimhash(simhashSegments);
+        }
+        else if (newSeq.size() > seqLength)
+        {
+            this->seq = std::make_unique<BitEncodedSeq>(newSeq.substr(0, seqLength)); // 2-bit DNA
+            recomputeSimhash(simhashSegments);
+        }
+        else
+        {
+            // Skip species with shorter sequences
+            throw std::invalid_argument("Species sequence is shorter than the required length.");
+        }
     }
     // ---------- assignment ----------------------------------------------------
     SpeciesRecord operator=(SpeciesRecord &other)
@@ -67,31 +87,23 @@ struct SpeciesRecord
         return ratio;
     }
 
+    void printSpecies()
+    {
+        std::cout << "Species: " << speciesName << "\n"
+                  << "Simhash: " << simhash << "\n"
+                  << "Coordinates: (" << x << ", " << y << ", " << z << ")\n";
+        seq->printSeq();
+        std::cout << "------------------------------------" << std::endl;
+    }
+
 private:
     void recomputeSimhash(std::size_t simhashSegments)
     {
         simhash = GeneticSimhash::computeSimhash(*seq, simhashSegments);
-
-        if (simhash >> 32)
-        {
-            uint32_t raw_x = static_cast<uint32_t>((simhash >> 43) & ((1ULL << 21) - 1));
-            uint32_t raw_y = static_cast<uint32_t>((simhash >> 22) & ((1ULL << 21) - 1));
-            uint32_t raw_z = static_cast<uint32_t>(simhash & ((1ULL << 22) - 1));
-
-            // Scale down to [0,4095]:
-            x = raw_x / 512;
-            y = raw_y / 512;
-            z = raw_z / 1024;
-        }
-        else
-        {
-            // If simhash is only 32-bit.
-            uint32_t raw_x = static_cast<uint32_t>((simhash >> 22) & ((1U << 10) - 1));
-            uint32_t raw_y = static_cast<uint32_t>((simhash >> 11) & ((1U << 11) - 1));
-            uint32_t raw_z = static_cast<uint32_t>(simhash & ((1U << 11) - 1));
-            x = raw_x;
-            y = raw_y;
-            z = raw_z;
-        }
+        auto coords = GeneticSimhash::makeCoords(simhash);
+        x = std::get<0>(coords);
+        y = std::get<1>(coords);
+        z = std::get<2>(coords);
     }
 };
+std::size_t SpeciesRecord::seqLength = 0;

@@ -79,4 +79,32 @@ namespace GeneticSimhash
         }
         return Simhash::compute(segHashes);
     }
+
+    std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> makeCoords(Simhash::hash_t simhash)
+    {
+        std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> coords;
+        if (simhash >> 32)
+        {
+            uint32_t raw_x = static_cast<uint32_t>((simhash >> 43) & ((1ULL << 21) - 1));
+            uint32_t raw_y = static_cast<uint32_t>((simhash >> 22) & ((1ULL << 21) - 1));
+            uint32_t raw_z = static_cast<uint32_t>(simhash & ((1ULL << 22) - 1));
+
+            // Scale down to [0,4095]:
+            std::get<0>(coords) = raw_x / 512;
+            std::get<1>(coords) = raw_y / 512;
+            std::get<2>(coords) = raw_z / 1024;
+        }
+        else
+        {
+            // If simhash is only 32-bit.
+            uint32_t raw_x = static_cast<uint32_t>((simhash >> 22) & ((1U << 10) - 1));
+            uint32_t raw_y = static_cast<uint32_t>((simhash >> 11) & ((1U << 11) - 1));
+            uint32_t raw_z = static_cast<uint32_t>(simhash & ((1U << 11) - 1));
+            std::get<0>(coords) = raw_x;
+            std::get<1>(coords) = raw_y;
+            std::get<2>(coords) = raw_z;
+        }
+        return coords;
+    }
+
 } // namespace GeneticSimhash
