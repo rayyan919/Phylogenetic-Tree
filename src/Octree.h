@@ -17,8 +17,7 @@ public:
     PhylogeneticTree(int minX, int minY, int minZ,
                      int maxX, int maxY, int maxZ, uint32_t length_)
         : bounds_{minX, minY, minZ, maxX, maxY, maxZ},
-          root_(std::make_unique<Node>(bounds_)),
-          length(length_) {}
+          root_(std::make_unique<Node>(bounds_)) {}
 
     // Insert a species record into the tree
     void insert(const SpeciesRecord &rec)
@@ -95,14 +94,24 @@ private:
     Bounds bounds_;
     std::unique_ptr<Node> root_;
     std::unordered_map<std::string, std::tuple<int, int, int>> nameToCoords_;
-    long long int length;
+    static int length;
 
     // Recursive insert
     void insertRec(Node *node, const SpeciesRecord &rec)
     {
         if (!contains(node->b, rec))
             return;
-        if (node->isLeaf)
+        if (node->isLeaf && length == 0)
+        {
+            length = rec.seq->size(); // set length on first insert
+            if (node->family->canInsert(rec))
+            {
+                node->family->insert(rec);
+                return;
+            }
+            subdivideNode(node);
+        }
+        else if (node->isLeaf)
         {
             if (node->family->canInsert(rec))
             {
@@ -269,6 +278,7 @@ private:
         return idx;
     }
 };
+int PhylogeneticTree::length = 0;
 
 // class OctreeNode
 // {
