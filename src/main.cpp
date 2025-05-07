@@ -13,9 +13,7 @@ int main()
         // phyloTree->print();
 
         Testcases testcases("../input/MediumData.csv");
-        testcases.testPrint();
-        testcases.testMutate("African Elephant");
-        testcases.testPrint();
+        testcases.testAll(); // Run all test cases
     }
     catch (const std::exception &e)
     {

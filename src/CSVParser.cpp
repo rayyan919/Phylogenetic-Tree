@@ -19,6 +19,18 @@ std::unique_ptr<PhylogeneticTree> CSVParser::createPhyloTree()
     return root;
 }
 
+std::string CSVParser::getRandomSpeciesName() const
+{
+    if (records.empty())
+    {
+        throw std::runtime_error("No species records available.");
+    }
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, records.size() - 1);
+    return records[dis(gen)].speciesName;
+}
+
 void CSVParser::parse()
 {
     std::ifstream file(filename);

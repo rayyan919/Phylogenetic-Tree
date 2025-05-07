@@ -12,6 +12,8 @@ public:
 
     std::unique_ptr<PhylogeneticTree> createPhyloTree();
 
+    std::string getRandomSpeciesName() const;
+
 private:
     std::string filename;
     std::vector<SpeciesRecord> records;
