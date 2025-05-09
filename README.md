@@ -1,4 +1,4 @@
-#🧬 Phylogenetic Tree using Octree + BK-Tree Hybrid (Data Structures II Project)
+# 🧬 Phylogenetic Tree using Octree + BK-Tree Hybrid (Data Structures II Project)
 
 This project implements a **high-performance phylogenetic tree** for managing species based on **genetic similarity**, using a combination of **Octree spatial partitioning** and **BK-tree indexing** under Hamming distance.
 
